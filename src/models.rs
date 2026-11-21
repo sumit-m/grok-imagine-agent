@@ -254,7 +254,10 @@ pub fn controls(models: &[Model]) -> Option<(Vec<Value>, Option<Value>)> {
         controls.push(json!({
             "id": "action", "kind": "segmented", "label": "Action", "modes": ["video"],
             "when": { "@videos": ["attached"] }, "default": "extend",
-            "options": [{ "value": "extend", "label": "Extend" }, { "value": "edit", "label": "Edit" }]
+            "options": [
+                { "value": "extend", "label": "Extend", "minVideoSeconds": 2 },
+                { "value": "edit", "label": "Edit" }
+            ]
         }));
     }
     if video.is_some() {
