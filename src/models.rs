@@ -89,10 +89,11 @@ pub fn parse(text: &str) -> Vec<Model> {
                 "video" => Media::Video,
                 _ => return None,
             };
-            let aspects: Vec<String> = list(get("aspects")?)
+            let mut aspects: Vec<String> = list(get("aspects")?)
                 .into_iter()
-                .filter(|a| a != "auto" && presets::usable_name(a))
+                .filter(|a| aspect_rank(a).is_some())
                 .collect();
+            aspects.sort_by_key(|a| aspect_rank(a));
             let resolutions: Vec<String> = list(get("resolutions")?)
                 .iter()
                 .filter(|r| presets::usable_name(r))
@@ -282,7 +283,9 @@ pub fn controls(models: &[Model]) -> Option<(Vec<Value>, Option<Value>)> {
                 "when": { "@images": ["attached"], "frame": frame_values() }
             }));
         }
-        for aspect in union(group.iter().map(|m| &m.aspects)) {
+        let mut ratios = union(group.iter().map(|m| &m.aspects));
+        ratios.sort_by_key(|a| aspect_rank(a));
+        for aspect in ratios {
             let offering: Vec<&str> = group
                 .iter()
                 .filter(|m| m.aspects.contains(&aspect))
@@ -292,7 +295,8 @@ pub fn controls(models: &[Model]) -> Option<(Vec<Value>, Option<Value>)> {
             if mode == "video" {
                 when.insert("frame".into(), json!(["none"]));
             }
-            let option = json!({ "value": aspect, "label": aspect, "modes": [mode] });
+            let name = aspect_rank(&aspect).map_or("", |rank| ASPECTS[rank].1);
+            let option = json!({ "value": aspect, "label": name, "hint": aspect, "modes": [mode] });
             aspect_options.push(with_when(option, with_models(when, &offering, group_ids)));
         }
     }
@@ -356,7 +360,7 @@ pub fn controls(models: &[Model]) -> Option<(Vec<Value>, Option<Value>)> {
     controls.push(res);
 
     controls.push(json!({
-        "id": "count", "kind": "number", "label": "Images", "icon": "layers",
+        "id": "count", "kind": "number", "label": "Image Count", "icon": "layers",
         "modes": ["image"], "min": 1, "max": 10, "default": "1", "options": []
     }));
     controls.push(json!({
@@ -469,6 +473,25 @@ pub fn refresh(harness_file: &Path, models_ini: &Path) -> Result<bool, String> {
     })
 }
 
+/// The aspect ratios the panel offers, in menu order, with their names (as
+/// Grok Imagine's web app names them, plus Portrait); a model's others are
+/// left out.
+const ASPECTS: [(&str, &str); 9] = [
+    ("2:3", "Poster"),
+    ("3:2", "Photo Print"),
+    ("4:3", "Presentation"),
+    ("3:4", "Portrait"),
+    ("1:1", "Square"),
+    ("9:16", "Story"),
+    ("16:9", "Widescreen"),
+    ("21:9", "Cinematic"),
+    ("5:2", "Banner"),
+];
+
+fn aspect_rank(ratio: &str) -> Option<usize> {
+    ASPECTS.iter().position(|(known, _)| *known == ratio)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -477,7 +500,7 @@ mod tests {
         [grok-imagine-image-2.0]\n\
         display=Quality 2.0\n\
         media=image\n\
-        aspects=1:1,16:9,9:19.5,auto\n\
+        aspects=1:1,16:9,3:4,9:19.5,auto\n\
         aspect_default=1:1\n\
         resolutions=1K,2K\n\
         res_default=2K\n\
@@ -532,7 +555,7 @@ mod tests {
                 "grok-imagine-video"
             ]
         );
-        assert_eq!(models[0].aspects, ["1:1", "16:9", "9:19.5"]);
+        assert_eq!(models[0].aspects, ["3:4", "1:1", "16:9"]);
         assert_eq!(models[2].resolutions, ["480p", "720p", "1080p"]);
         assert!(models[3].takes("video") && !models[2].takes("video"));
         assert_eq!(panel_resolution("2k"), "2K");
@@ -565,12 +588,14 @@ mod tests {
         let aspect = find(&controls, "aspect");
         assert_eq!(
             values(&aspect["options"]),
-            ["auto", "1:1", "16:9", "9:19.5", "frame", "16:9", "9:16"]
+            ["auto", "3:4", "1:1", "16:9", "frame", "9:16", "16:9"]
         );
         assert_eq!(
-            aspect["options"][3]["when"],
+            aspect["options"][1]["when"],
             json!({ "model": ["grok-imagine-image-2.0"] })
         );
+        assert_eq!(aspect["options"][1]["label"], "Portrait");
+        assert_eq!(aspect["options"][1]["hint"], "3:4");
         assert_eq!(aspect["options"][5]["when"], json!({ "frame": ["none"] }));
         assert_eq!(aspect["defaultByMode"], json!({ "video": "16:9" }));
 
