@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 
 use crate::command::{self, Attach, Request};
-use crate::models::VOICES;
+use crate::models::is_voice;
 
 pub const TAG: &str = "buzz-composer";
 pub const HARNESS_ID: &str = "imagine";
@@ -211,7 +211,7 @@ pub fn with_grok_references(text: &str) -> (String, Vec<String>) {
             .filter(|n| *n > 0 && !lower[5..].starts_with('0'));
         match (starts_word, image) {
             (true, Some(n)) => out.push_str(&format!("<IMAGE_{}>", n - 1)),
-            (true, None) if VOICES.contains(&lower.as_str()) => {
+            (true, None) if is_voice(&lower) => {
                 let index = voices.iter().position(|v| *v == lower).unwrap_or_else(|| {
                     voices.push(lower.clone());
                     voices.len() - 1

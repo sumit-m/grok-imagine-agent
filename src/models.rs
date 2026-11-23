@@ -21,8 +21,43 @@ const IMAGE_DEFAULT: &str = "grok-imagine-image-2.0";
 const VIDEO_DEFAULT: &str = "grok-imagine-video-1.5";
 /// Grok's reference images for a video.
 const MAX_VIDEO_REFERENCES: u32 = 14;
-/// The preset voices Grok narrates with (`--voice`), as prompt handles.
-pub const VOICES: [&str; 5] = ["ara", "eve", "leo", "rex", "sal"];
+/// The preset voices Grok narrates with (`--voice`), as prompt handles, each
+/// with the Voice menu tab it is listed under. Buzz orders the tabs by first
+/// appearance and opens on the first, so Female leads.
+pub const VOICES: [(&str, &str); 26] = [
+    ("ara", FEMALE),
+    ("carina", FEMALE),
+    ("celeste", FEMALE),
+    ("eve", FEMALE),
+    ("iris", FEMALE),
+    ("luna", FEMALE),
+    ("ursa", FEMALE),
+    ("altair", MALE),
+    ("atlas", MALE),
+    ("castor", MALE),
+    ("cosmo", MALE),
+    ("helios", MALE),
+    ("helix", MALE),
+    ("kepler", MALE),
+    ("leo", MALE),
+    ("lumen", MALE),
+    ("lux", MALE),
+    ("naksh", MALE),
+    ("orion", MALE),
+    ("perseus", MALE),
+    ("rex", MALE),
+    ("rigel", MALE),
+    ("sal", MALE),
+    ("sirius", MALE),
+    ("zagan", MALE),
+    ("zenith", MALE),
+];
+const MALE: &str = "Male";
+const FEMALE: &str = "Female";
+
+pub fn is_voice(name: &str) -> bool {
+    VOICES.iter().any(|(voice, _)| *voice == name)
+}
 /// The resolution references cap a video at.
 const REFERENCE_MAX_RES: &str = "720p";
 
@@ -403,7 +438,8 @@ pub fn controls(models: &[Model]) -> Option<(Vec<Value>, Option<Value>)> {
         json!({
             "id": "voice", "kind": "assets", "label": "Voice", "title": "Choose a voice",
             "icon": "speech", "modes": ["video"], "when": when,
-            "options": VOICES.iter().map(|v| json!({ "value": v, "label": capitalized(v) }))
+            "options": VOICES.iter()
+                .map(|(v, group)| json!({ "value": v, "label": capitalized(v), "group": group }))
                 .collect::<Vec<_>>()
         })
     });
@@ -616,9 +652,15 @@ mod tests {
             voice["when"],
             json!({ "@videos": ["none"], "model": ["grok-imagine-video-1.5"] })
         );
+        assert_eq!(voice["options"].as_array().unwrap().len(), 26);
         assert_eq!(
-            voice["options"][1],
-            json!({ "value": "eve", "label": "Eve" })
+            voice["options"][3],
+            json!({ "value": "eve", "label": "Eve", "group": "Female" })
+        );
+        assert_eq!(voice["options"][0]["group"], "Female");
+        assert_eq!(
+            voice["options"][7],
+            json!({ "value": "altair", "label": "Altair", "group": "Male" })
         );
     }
 
